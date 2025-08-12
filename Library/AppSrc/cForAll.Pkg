@@ -1,0 +1,463 @@
+﻿Use LanguageText.Pkg
+
+// A property of this struct is used to store the constrain information
+Struct tForAllConstraint
+    Integer iTable
+    Integer iColumn
+    Integer iMode
+    String sCompareValue
+End_Struct
+
+#IFSAME Language$Current Language$English
+    #Include cForAll_English.inc
+#ENDIF
+
+#IFSAME Language$Current Language$Nederlands
+    #Include cForAll_Nederlands.inc
+#ENDIF
+
+#IFSAME Language$Current Language$Svenska
+    #Include cForAll_Svenska.inc
+#ENDIF
+
+#IFSAME Language$Current Language$Deutsch
+    #Include cForAll_Deutsch.inc
+#ENDIF
+
+#IFSAME Language$Current Language$Dansk
+    #Include cForAll_Dansk.inc
+#ENDIF
+
+#IFSAME Language$Current Language$Portugues
+    #Include cForAll_Portugues.inc
+#ENDIF
+
+#IFSAME Language$Current Language$Francais
+    #Include cForAll_Francais.inc
+#ENDIF
+
+#IFSAME Language$Current Language$Italiano
+    #Include cForAll_Italiano.inc
+#ENDIF
+
+#IFSAME Language$Current Language$Espanol
+    #Include cForAll_Espanol.inc
+#ENDIF
+
+#IFSAME Language$Current Language$Czech
+    #Include cForAll_Czech.inc
+#ENDIF
+
+#IFSAME Language$Current Language$Russian
+    #Include cForAll_Russian.inc
+#ENDIF
+
+#IFSAME Language$Current Language$Hugarian
+    #Include cForAll_Hungarian.inc
+#ENDIF
+
+#IFSAME Language$Current Language$Polish
+    #Include cForAll_Polish.inc
+#ENDIF
+
+#IFSAME Language$Current Language$Norsk
+    #Include cForAll_Norsk.inc
+#ENDIF
+
+// This class defines the methods to enumerate the records of a table
+// in an object oriented way while the FOR_ALL command uses a procedural
+// with subroutines. Another nice feature of this OO version is that you
+// can use a filehandle instead of a real tablename.
+Class cForAll Is A cObject
+    { MethodType=Event }
+    Procedure OnRecordFound Handle hoForAll RowId riRecord
+        // Event that fires for each found record
+    End_Procedure // OnRecordFound
+
+    { MethodType=Event }
+    Procedure OnStartProcess Handle hoForAll
+        // Event for when the process starts
+    End_Procedure // OnStartProcess
+
+    { MethodType=Event }
+    Procedure OnEndProcess Handle hoForAll
+        // Event for when the process ends
+    End_Procedure // OnEndProcess
+
+    { MethodType=Event }
+    Procedure OnPreFindRecords Handle hoForAll
+        // Event firing when the loop to find the records is about to start
+    End_Procedure // OnPreFindRecords
+
+    { MethodType=Event }
+    Procedure OnPostFindRecords Handle hoForAll
+        // Event firing when the loop to find the records was finished
+    End_Procedure // OnPostFindRecords
+
+    Procedure Construct_Object
+        Forward Send Construct_Object
+
+        // Private property to keep the defined constraint information
+        { DesignTime=False }
+        Property tForAllConstraint[] private.pForAllConstraints
+        // Private property to store the object is of the parent table(s)
+        // to which a relational constraint should be defined
+        { DesignTime=False }
+        Property Handle[] private.phoParentForAlls
+        // Put the filehandle of the table you want to read thru in this property
+        Property Integer piMainTable
+        // The next 5 properties can be set if you want another event message to
+        // take place than the default ones.
+        Property Handle phmOnRecordFound Msg_OnRecordFound
+        Property Handle phmOnStartProcess Msg_OnStartProcess
+        Property Handle phmOnEndProcess Msg_OnEndProcess
+        Property Handle phmOnPreFindRecords Msg_OnPreFindRecords
+        Property Handle phmOnPostFindRecords Msg_OnPostFindRecords
+        // If one of the above messages needs to be send to a different object
+        // you need to put that object id in the following property
+        Property Handle phoMessageDestination Self
+        // Each constraintset needs a unique number. By default we take the object
+        // id and multiply this with -12345. If that is not ok with you you need to
+        // place your own constraintset id in this property
+        Property Integer piConstraintSetId (Self * -12345)
+        // Do we perform a search BY or DOWN. Any value different from UPWARD_DIRECTION
+        // (this can be DOWNWARD_DIRECTION but also 1001 or something else) causes
+        // a desending search.
+        { EnumList="UPWARD_DIRECTION, DOWNWARD_DIRECTION" }
+        Property Boolean pbSearchDirection UPWARD_DIRECTION
+        // If you want to start over after each found record you can set this property
+        // to true. Almost only needed if you save records causing records to be skipped
+        Property Boolean pbUseAsQueue False
+        // If you specify a value in piOrdering you overrule the default best index
+        // detection by the runtime. Do this only when you think you can better determine
+        // the best index than the runtime
+        Property Integer piOrdering -1
+        // This property can be set inside OnRecordFound to stop searching records
+        Property Boolean pbContinue True
+        // Set this property to true when you want Constrain_Found_Count and
+        // Constrain_Tests_Count to be reset.
+        Property Boolean pbInitConstraintCounters False
+        // Private property to keep track if the code needs to use a internal routine
+        // to validate that the record matches an AS constraint
+        { DesignTime=False }
+        Property Boolean private.pbUseVariableConstraint False
+    End_Procedure
+
+    // We use this function to find out if the object is a cForAll object
+    Function IsTruecForAll Returns Boolean
+        Function_Return True
+    End_Function
+
+    // This method clears the relates to parent array information.
+    Procedure DoRemoveRelatesToConstraintInfo
+        Handle[] hoParentForAlls
+
+        Set private.phoParentForAlls To hoParentForAlls
+    End_Procedure
+
+    // This method removes the constraint information from the internal array. Needed
+    // if you want to use the same object multiple times for different conditions
+    Procedure DoRemoveConstraintInfo
+        tForAllConstraint[] ForAllConstraints
+
+        Set private.pForAllConstraints To ForAllConstraints
+        Set private.pbUseVariableConstraint To False
+    End_Procedure
+
+    // Add an cForAllObject so that we can add a relates to constraint later
+    // The passed object will be tested to see if it is derrived from cForAll
+    Procedure DoAddParentForAll Handle hoParentForAll
+        Handle[] hoParentForAlls
+        Integer eDelegationMode
+        Boolean bIsTruecForAll
+
+        Get Delegation_Mode Of hoParentForAll To eDelegationMode
+        Set Delegation_Mode Of hoParentForAll To No_Delegate_Or_Error
+        Get IsTruecForAll To bIsTruecForAll
+        Set Delegation_Mode Of hoParentForAll To eDelegationMode
+
+        If (bIsTruecForAll) Begin
+            Get private.phoParentForAlls To hoParentForAlls
+            Move hoParentForAll To hoParentForAlls[SizeOfArray(hoParentForAlls)]
+            Set private.phoParentForAlls To hoParentForAlls
+        End
+        Else Begin
+            Error DFERR_PROGRAM C_$PASSEDOBJECTIDISNOTACFORALLOBJECT
+        End
+    End_Procedure
+
+    // Main procedure of this class. The finding of records starts by sending
+    // this message to the cForAll object.
+    Procedure DoStartProcess
+        Integer iMainTable
+        Boolean bOpened
+        String sErrorText
+        Handle hoMessageDestination hmOnStartProcess hmOnEndProcess
+        Handle hmOnPreFindRecords hmOnPostFindRecords
+
+        // Check if the table is set and opened. If not opened declare an error
+        // and stop the routine. The error text can be translated
+        Get piMainTable To iMainTable
+        If (iMainTable > 0 And iMainTable < 4096) Begin
+            Get_Attribute DF_FILE_OPENED Of iMainTable To bOpened
+        End
+        If (Not (bOpened)) Begin
+            Move (SFormat (C_$CFORALLTABLENOTOPENED, iMainTable, Name (Self))) To sErrorText
+            Error DFERR_PROGRAM sErrorText
+            Procedure_Return
+        End
+
+        // Get the message destination object id and check if it (still) exists. If the
+        // object id is zero put the object id of yourself in the destination variable
+        Get phoMessageDestination To hoMessageDestination
+        If (hoMessageDestination > 0) Begin
+            Get Object_Id Of hoMessageDestination To hoMessageDestination
+        End
+        If (hoMessageDestination <= 0) Begin
+            Move Self To hoMessageDestination
+        End
+
+        // If there is a event id for start of the process run that message
+        // The message will be send to the destination object
+        Get phmOnStartProcess To hmOnStartProcess
+        If (hmOnStartProcess > 0) Begin
+            Send hmOnStartProcess Of hoMessageDestination Self
+        End
+
+        Send DoBuildConstraintSet
+        Send DoInitConstraintCounters
+
+        // If there is a event id for a prefind message run that message
+        // The message will be send to the destination object
+        Get phmOnPreFindRecords To hmOnPreFindRecords
+        If (hmOnPreFindRecords > 0) Begin
+            Send hmOnPreFindRecords Of hoMessageDestination Self
+        End
+
+        // Main loop. Here we find the records for the main table
+        Send DoFindRecords iMainTable
+
+        // If there is a event id for a postfind message run that message
+        // The message will be send to the destination object
+        Get phmOnPostFindRecords To hmOnPostFindRecords
+        If (hmOnPostFindRecords > 0) Begin
+            Send hmOnPostFindRecords Of hoMessageDestination Self
+        End
+
+        // Remove the constraint_set information
+        Send DoDestroyConstraintSet
+
+        // If there is a event id for a end process message run that message
+        // The message will be send to the destination object
+        Get phmOnEndProcess To hmOnEndProcess
+        If (hmOnEndProcess > 0) Begin
+            Send hmOnEndProcess Of hoMessageDestination Self
+        End
+    End_Procedure
+
+    // This method will be used internally to reset the constrain counters
+    // if the property pbInitConstraintCounters is set to true. The variables
+    // are global variables.
+    Procedure DoInitConstraintCounters
+        Boolean bInitConstraintCounters
+
+        Get pbInitConstraintCounters To bInitConstraintCounters
+        If (bInitConstraintCounters) Begin
+            Move 0 To Constrain_Found_Count
+            Move 0 To Constrain_Tests_Count
+        End
+    End_Procedure
+
+    // Main routine of the cForAll.
+    Procedure DoFindRecords Integer iMainTable
+        Integer iConstraintSetId iOrdering
+        Handle hmOnRecordFound hoMessageDestination
+        RowId riRecord
+        Boolean bSearchDirection bUseAsQueue bContinue
+
+        // What message should be send as event when a record matches the criteria
+        Get phmOnRecordFound To hmOnRecordFound
+        // Where should this message be send to
+        Get phoMessageDestination To hoMessageDestination
+        // Do you want to start searching for records at the begin of the constraint_set after
+        // a record has been found
+        Get pbUseAsQueue To bUseAsQueue
+        // What is the index to be used for searching records
+        Get piOrdering To iOrdering
+
+        // Initialize the continue of searching. Your code can abort searching
+        Move True To bContinue
+        Set pbContinue To bContinue
+
+        // Get and use the constrain set
+        Get piConstraintSetId To iConstraintSetId
+        Constraint_Set iConstraintSetId
+
+        // Find out if we start at the beginning of the record set or the end and
+        // start looking for records from there.
+        Get pbSearchDirection To bSearchDirection
+        If (bSearchDirection = UPWARD_DIRECTION) Begin
+            Constrained_Find First iMainTable By iOrdering
+        End
+        Else Begin
+            Constrained_Find Last iMainTable By iOrdering
+        End
+        While (Found And bContinue)
+            // Retrieve the record rowid and pass that to the record found event
+            Move (GetRowId (iMainTable)) To riRecord
+            Send hmOnRecordFound Of hoMessageDestination Self riRecord
+            // find out if the code should continue or not
+            Get pbContinue To bContinue
+            If (bContinue) Begin
+                // Make sure the right constraint_set is in use. Code may have
+                // switched constrain sets
+                Constraint_Set iConstraintSetId
+                // Either find the next record in the constraint_set or start over
+                // again.
+                If (Not (bUseAsQueue)) Begin
+                    Constrained_Find Next
+                End
+                Else Begin
+                    If (bSearchDirection = UPWARD_DIRECTION) Begin
+                        Constrained_Find First iMainTable By iOrdering
+                    End
+                    Else Begin
+                        Constrained_Find Last iMainTable By iOrdering
+                    End
+                End
+            End
+        Loop
+    End_Procedure
+
+    // Internal function that will be called for each record when the code
+    // added an AS constraint to the system
+    Function VariableCompare Returns Boolean
+        tForAllConstraint[] ForAllConstraintInfo
+        Integer iElements iElement
+        Boolean bRecordIsOk bCompareOk
+
+        // At this moment the record should be marked as OK/Found
+        Move True To bRecordIsOk
+
+        // Enumerate the AS constrain values against the current record
+        Get private.pForAllConstraints To ForAllConstraintInfo
+        Move (SizeOfArray (ForAllConstraintInfo)) To iElements
+        Decrement iElements
+        For iElement From 0 To iElements
+            If (ForAllConstraintInfo[iElement].iMode = -1) Begin
+                // The INTEGER() is used to make sure the string is executed correctly
+                Move (Integer (Eval (ForAllConstraintInfo[iElement].sCompareValue)) = True) To bCompareOk
+                Move (bRecordIsOk And bCompareOk) To bRecordIsOk
+            End
+        Loop
+
+        Function_Return bRecordIsOk
+    End_Function
+
+    // This routine translates the constraint information to constrain statements
+    Procedure DoBuildConstraintSet
+        tForAllConstraint[] ForAllConstraintInfo
+        Integer iElements iElement iConstraintSetId iMainTable iParentTable
+        Handle[] hoParentForAlls
+        Handle hoParentForAll
+        Boolean bUseVariableConstraint
+
+        // Get the main table information
+        Get piMainTable To iMainTable
+
+        // Get and set the correct constraint_set
+        Get piConstraintSetId To iConstraintSetId
+        Constraint_Set iConstraintSetId Clear
+
+        // If one of the constraint conditions was an AS constraint
+        // this property is true and we tell the runtime to execute the
+        // the function variableCompare for each record found
+        Get private.pbUseVariableConstraint To bUseVariableConstraint
+        If (bUseVariableConstraint) Begin
+            vConstrain iMainTable As (VariableCompare (Self))
+        End
+
+        // Get the constraint information array and copy the non-AS constraints
+        // to the runtime where it keeps track of filter information
+        Get private.pForAllConstraints To ForAllConstraintInfo
+        Move (SizeOfArray (ForAllConstraintInfo)) To iElements
+        Decrement iElements
+        For iElement From 0 To iElements
+            If (ForAllConstraintInfo[iElement].iMode <> -1) Begin
+                vConstrain ForAllConstraintInfo[iElement].iTable ForAllConstraintInfo[iElement].iColumn ForAllConstraintInfo[iElement].iMode ForAllConstraintInfo[iElement].sCompareValue
+            End
+        Loop
+
+        // If relates-to constraints are wanted add the relates-to table
+        // to the runtime constraint information
+        Get private.phoParentForAlls To hoParentForAlls
+        Move (SizeOfArray (hoParentForAlls)) To iElements
+        Decrement iElements
+        For iElement From 0 To iElements
+            Get Object_Id Of hoParentForAlls[iElement] To hoParentForAll
+            If (hoParentForAll > 0) Begin
+                Get piMainTable Of hoParentForAll To iParentTable
+                If (iParentTable > 0 And iParentTable < 4096) Begin
+                    vConstrain iMainTable Relates iParentTable
+                End
+            End
+        Loop
+    End_Procedure
+
+    // This method must be used to add AS constraints to the system. The passed
+    // table number MUST be the main table and the piMainTable property must be
+    // set before the method is executed, else an error is declared.
+    Procedure DoAddConstraintAsInfo Integer iTable String sExpression
+        tForAllConstraint[] ForAllConstraintInfo
+        Integer iNewElement iMainTable
+
+        If (sExpression <> '') Begin
+            Get piMainTable To iMainTable
+            If (iMainTable = iTable) Begin
+                Get private.pForAllConstraints To ForAllConstraintInfo
+                Move (SizeOfArray (ForAllConstraintInfo)) To iNewElement
+                Move iTable To ForAllConstraintInfo[iNewElement].iTable
+                Move -1 To ForAllConstraintInfo[iNewElement].iColumn
+                Move -1 To ForAllConstraintInfo[iNewElement].iMode
+                Move sExpression To ForAllConstraintInfo[iNewElement].sCompareValue
+
+                Set private.pForAllConstraints To ForAllConstraintInfo
+                Set private.pbUseVariableConstraint To True
+            End
+            Else Begin
+                Error DFERR_PROGRAM C_$CONSTRAINTISNOTFORMAINTABLE
+            End
+        End
+    End_Procedure
+
+    // This routine adds the standard constrain information to the cForAll object
+    Procedure DoAddConstraintInfo Integer iTable Integer iColumn Integer iMode String sCompareValue
+        tForAllConstraint[] ForAllConstraintInfo
+        Integer iNewElement
+
+        Get private.pForAllConstraints To ForAllConstraintInfo
+
+        Move (SizeOfArray (ForAllConstraintInfo)) To iNewElement
+        Move iTable To ForAllConstraintInfo[iNewElement].iTable
+        Move iColumn To ForAllConstraintInfo[iNewElement].iColumn
+        Move iMode To ForAllConstraintInfo[iNewElement].iMode
+        Move sCompareValue To ForAllConstraintInfo[iNewElement].sCompareValue
+
+        Set private.pForAllConstraints To ForAllConstraintInfo
+    End_Procedure
+
+    // This internal routine removes the constraint set
+    Procedure DoDestroyConstraintSet
+        Integer iConstraintSetId
+
+        Get piConstraintSetId To iConstraintSetId
+        Constraint_Set iConstraintSetId Delete
+    End_Procedure
+
+    // When the object is being destroyed remove the constraint set
+    Procedure Destroy_Object
+        Send DoDestroyConstraintSet
+
+        Forward Send Destroy_Object
+    End_Procedure
+End_Class

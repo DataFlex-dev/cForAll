@@ -1,21 +1,16 @@
-# Library Template
+# cForAll Library
+
+The cForAll class in this library should be used as replacement of the procedural version of the For_All command. The advantage of cForAll is that it is true object oriented coded and that filters can be created on the fly. cForAll supports data dictionaries but does not depend or require them. Data dictionaries are the preferred way to handle data in DataFlex.
 
 ---
 
 ## Library Information
 
-This repository is a template for developing DataFlex Libraries. The `Library` directory should contain the library, and the `Demo` directory should be a demo workspace that uses the library. (Optional) the `help` directory can be used for documentation and release notes.
+This repository contains a Library directory where the source for the cForAll library is, and the Demo directory where you can find a demo workspace that uses the library.
 
-###### External Components
-
-If applicable, list the external components used in the table below:
-
-| Component | Version |
-| --------- | ------- |
-|           |         |
 
 ## General Information
 
 | Product  | Version           |
 | -------- | ----------------- |
-| DataFlex | 23.0, 24.0, 25.0  |
+| DataFlex | 25.0  |

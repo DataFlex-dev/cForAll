@@ -1,0 +1,11 @@
+[Properties]
+Version=25.0
+[WorkspacePaths]
+ConfigFile=.\Programs\Config.ws
+[Projects]
+Project0=cForAllTest.src
+[Libraries]
+Lib1=..\Library\cForAll.sws
+[Conditionals]
+Is$WebApp=False
+Is$Win64=False

@@ -1,0 +1,16 @@
+=========================================================
+Welcome to the DataFlex cForAll Library 
+=========================================================
+
+This release is for the DataFlex 2025.
+
+Release date: 2025, March
+
+Updates for DataFlex 2025
+
+==================================================================
+Please report any bugs or suggestions to via the Data Access
+forums at http://support.dataaccess.com/forums
+====================================================================
+Enjoy the use of the DataFlex cForAll Library!
+====================================================================
